@@ -1,0 +1,10 @@
+---
+cifs_mount_password_env_name: CIFS_PASSWORD
+cifs_mount_source: //bel-fs-01/Builds
+cifs_mount_path: /mnt/fs-share
+cifs_mount_domain: home.local
+cifs_mount_username: svc-builder
+cifs_mount_credentials_file: /root/.smbcredentials-builds
+cifs_mount_version: "3.1.1"
+cifs_mount_uid: 2005
+cifs_mount_gid: 2005

@@ -1,0 +1,32 @@
+---
+- name: Configure Bamboo build hosts
+  hosts: bamboo_build_hosts
+  remote_user: ansible
+  become: true
+  gather_facts: true
+  serial: "{{ deployment_serial | default(1) }}"
+  any_errors_fatal: true
+
+  pre_tasks:
+    - name: Verify supported operating system
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "CentOS"
+          - ansible_distribution_major_version == "10"
+        fail_msg: >-
+          This repository supports only CentOS Stream 10.
+          Detected {{ ansible_distribution }} {{ ansible_distribution_version }}.
+      tags:
+        - always
+
+  roles:
+    - role: docker_engine
+      tags:
+        - docker
+    - role: cifs_mount
+      tags:
+        - cifs
+    - role: bamboo_agents
+      tags:
+        - bamboo
+

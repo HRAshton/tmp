@@ -1,0 +1,23 @@
+---
+name: {{ bamboo_agents_compose_project_name }}
+
+services:
+{% for agent_number in range(1, bamboo_agents_count + 1) %}
+  bamboo-agent-{{ agent_number }}:
+    image: {{ bamboo_agents_image | quote }}
+    container_name: bamboo-agent-{{ agent_number }}
+    hostname: bamboo-agent-{{ agent_number }}
+    restart: unless-stopped
+    pull_policy: missing
+    environment:
+      BAMBOO_SERVER: {{ bamboo_agents_server_url | quote }}
+      BAMBOO_AGENT_HOME: /home/bamboo-agent-{{ agent_number }}
+    group_add:
+      - "{{ bamboo_agents_docker_socket.stat.gid }}"
+    volumes:
+      - /home/bamboo-agent-{{ agent_number }}:/home/bamboo-agent-{{ agent_number }}:rw
+      - {{ bamboo_agents_cifs_mount_path }}:{{ bamboo_agents_cifs_mount_path }}:rw
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      - {{ bamboo_agents_docker_cli_path }}:/usr/local/bin/docker:ro
+      - {{ bamboo_agents_docker_cli_plugins_path }}:/usr/local/lib/docker/cli-plugins:ro
+{% endfor %}

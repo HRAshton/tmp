@@ -1,0 +1,11 @@
+---
+bamboo_agents_count: 5
+bamboo_agents_image: atlassian/bamboo-agent-base:10.2.11-ubi9
+bamboo_agents_server_url: http://bamboo.home.local/agentServer/
+bamboo_agents_uid: 2005
+bamboo_agents_gid: 2005
+bamboo_agents_compose_dir: /opt/bamboo-agents
+bamboo_agents_compose_project_name: bamboo-agents
+bamboo_agents_cifs_mount_path: /mnt/fs-share
+bamboo_agents_docker_cli_path: /usr/bin/docker
+bamboo_agents_docker_cli_plugins_path: /usr/libexec/docker/cli-plugins

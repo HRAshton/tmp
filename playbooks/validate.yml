@@ -1,0 +1,55 @@
+---
+- name: Validate Bamboo build hosts
+  hosts: bamboo_build_hosts
+  remote_user: ansible
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Check Docker service
+      ansible.builtin.command:
+        argv:
+          - systemctl
+          - is-active
+          - docker
+      register: docker_service_check
+      changed_when: false
+      failed_when: docker_service_check.stdout | trim != "active"
+
+    - name: Check CIFS mount
+      ansible.builtin.command:
+        argv:
+          - findmnt
+          - --mountpoint
+          - "{{ cifs_mount_path }}"
+          - --types
+          - cifs
+      changed_when: false
+
+    - name: Inspect expected Bamboo Agent containers
+      community.docker.docker_container_info:
+        name: "bamboo-agent-{{ item }}"
+      loop: "{{ range(1, bamboo_agents_count + 1) | list }}"
+      register: bamboo_container_info
+
+    - name: Verify all Bamboo Agent containers are running
+      ansible.builtin.assert:
+        that:
+          - item.exists
+          - item.container.State.Status == "running"
+        fail_msg: "Container bamboo-agent-{{ item.item }} is absent or not running."
+      loop: "{{ bamboo_container_info.results }}"
+      loop_control:
+        label: "bamboo-agent-{{ item.item }}"
+
+    - name: Verify Docker CLI and socket access inside each agent
+      ansible.builtin.command:
+        argv:
+          - docker
+          - exec
+          - "bamboo-agent-{{ item }}"
+          - docker
+          - version
+      loop: "{{ range(1, bamboo_agents_count + 1) | list }}"
+      changed_when: false
+      no_log: false

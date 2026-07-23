@@ -1,0 +1,71 @@
+---
+- name: Read the CIFS password from the controller environment
+  ansible.builtin.set_fact:
+    cifs_mount_password_value: >-
+      {{ lookup('ansible.builtin.env', cifs_mount_password_env_name) }}
+  no_log: true
+
+- name: Require a non-empty CIFS password
+  ansible.builtin.assert:
+    that:
+      - cifs_mount_password_value | length > 0
+    fail_msg: >-
+      Secret environment variable {{ cifs_mount_password_env_name }} is empty or absent.
+  no_log: true
+
+- name: Install CIFS and SELinux management packages
+  ansible.builtin.dnf:
+    name:
+      - cifs-utils
+      - policycoreutils-python-utils
+    state: present
+
+- name: Create the CIFS mount directory
+  ansible.builtin.file:
+    path: "{{ cifs_mount_path }}"
+    state: directory
+    owner: "{{ cifs_mount_uid }}"
+    group: "{{ cifs_mount_gid }}"
+    mode: "0770"
+
+- name: Store CIFS credentials outside the repository
+  ansible.builtin.copy:
+    dest: "{{ cifs_mount_credentials_file }}"
+    content: |
+      username={{ cifs_mount_username }}
+      password={{ cifs_mount_password_value }}
+      domain={{ cifs_mount_domain }}
+    owner: root
+    group: root
+    mode: "0600"
+    backup: true
+  no_log: true
+
+- name: Permit containers to access CIFS mounts under SELinux
+  ansible.posix.seboolean:
+    name: virt_use_samba
+    state: true
+    persistent: true
+
+- name: Persist and mount the CIFS share
+  ansible.posix.mount:
+    src: "{{ cifs_mount_source }}"
+    path: "{{ cifs_mount_path }}"
+    fstype: cifs
+    opts: >-
+      {{
+        [
+          'credentials=' ~ cifs_mount_credentials_file,
+          'vers=' ~ cifs_mount_version,
+          'rw',
+          '_netdev',
+          'nofail',
+          'uid=' ~ (cifs_mount_uid | string),
+          'gid=' ~ (cifs_mount_gid | string),
+          'file_mode=0660',
+          'dir_mode=0770'
+        ] | join(',')
+      }}
+    state: mounted
+    backup: true
+    opts_no_log: true

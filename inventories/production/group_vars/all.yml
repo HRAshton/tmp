@@ -1,0 +1,46 @@
+---
+# Bootstrap
+bootstrap_managed_user: ansible
+bootstrap_public_key_file: "{{ playbook_dir }}/../files/ansible.pub"
+
+# Docker. Пакеты не обновляются после установки, пока явно не передано
+# docker_engine_upgrade_enabled=true.
+docker_engine_upgrade_enabled: false
+docker_engine_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+docker_engine_daemon_config:
+  live-restore: true
+  log-driver: local
+  log-opts:
+    max-size: 20m
+    max-file: "5"
+
+# CIFS. Пароль берётся только из environment variable CIFS_PASSWORD.
+cifs_mount_password_env_name: CIFS_PASSWORD
+cifs_mount_source: //bel-fs-01/Builds
+cifs_mount_path: /mnt/fs-share
+cifs_mount_domain: home.local
+cifs_mount_username: svc-builder
+cifs_mount_credentials_file: /root/.smbcredentials-builds
+cifs_mount_version: "3.1.1"
+cifs_mount_uid: 2005
+cifs_mount_gid: 2005
+
+# Bamboo Agents
+bamboo_agents_count: 5
+bamboo_agents_image: atlassian/bamboo-agent-base:10.2.11-ubi9
+bamboo_agents_server_url: http://bamboo.home.local/agentServer/
+bamboo_agents_uid: 2005
+bamboo_agents_gid: 2005
+bamboo_agents_compose_dir: /opt/bamboo-agents
+bamboo_agents_compose_project_name: bamboo-agents
+bamboo_agents_cifs_mount_path: "{{ cifs_mount_path }}"
+bamboo_agents_docker_cli_path: /usr/bin/docker
+bamboo_agents_docker_cli_plugins_path: /usr/libexec/docker/cli-plugins
+
+# По умолчанию серверы меняются по одному.
+deployment_serial: 1

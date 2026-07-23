@@ -1,0 +1,64 @@
+---
+- name: Ensure Python and sudo are available
+  ansible.builtin.raw: |
+    if command -v python3 >/dev/null 2>&1 && command -v sudo >/dev/null 2>&1; then
+      exit 0
+    fi
+    dnf -y install python3 sudo
+    echo BOOTSTRAP_PACKAGES_CHANGED
+  register: bootstrap_packages
+  changed_when: "'BOOTSTRAP_PACKAGES_CHANGED' in bootstrap_packages.stdout"
+
+- name: Reset SSH connection after installing prerequisites
+  ansible.builtin.meta: reset_connection
+
+- name: Gather facts
+  ansible.builtin.setup:
+
+- name: Verify supported operating system
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution == "CentOS"
+      - ansible_distribution_major_version == "10"
+    fail_msg: >-
+      This repository supports only CentOS Stream 10.
+      Detected {{ ansible_distribution }} {{ ansible_distribution_version }}.
+
+- name: Read the managed user's public key on the controller
+  ansible.builtin.set_fact:
+    bootstrap_managed_user_public_key: >-
+      {{ lookup('ansible.builtin.file', bootstrap_public_key_file) | trim }}
+
+- name: Reject the placeholder public key
+  ansible.builtin.assert:
+    that:
+      - "'REPLACE_' not in bootstrap_managed_user_public_key"
+      - bootstrap_managed_user_public_key is match('^(ssh-|ecdsa-|sk-)')
+    fail_msg: >-
+      Replace files/ansible.pub with the real public SSH key before bootstrap.
+
+- name: Create the managed Ansible user
+  ansible.builtin.user:
+    name: "{{ bootstrap_managed_user }}"
+    comment: Ansible automation
+    shell: /bin/bash
+    create_home: true
+    password_lock: true
+    state: present
+
+- name: Install the managed user's SSH key
+  ansible.posix.authorized_key:
+    user: "{{ bootstrap_managed_user }}"
+    key: "{{ bootstrap_managed_user_public_key }}"
+    exclusive: true
+    manage_dir: true
+    state: present
+
+- name: Grant passwordless sudo to the managed user
+  ansible.builtin.copy:
+    dest: "/etc/sudoers.d/90-{{ bootstrap_managed_user }}"
+    content: "{{ bootstrap_managed_user }} ALL=(ALL) NOPASSWD: ALL\n"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: /usr/sbin/visudo -cf %s

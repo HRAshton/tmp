@@ -1,0 +1,73 @@
+---
+- name: Validate Bamboo Agent settings
+  ansible.builtin.assert:
+    that:
+      - bamboo_agents_count | int > 0
+      - bamboo_agents_image | length > 0
+      - bamboo_agents_server_url is match('^https?://')
+    fail_msg: "Bamboo Agent count, image and server URL must be valid."
+
+- name: Check host Docker CLI
+  ansible.builtin.stat:
+    path: "{{ bamboo_agents_docker_cli_path }}"
+  register: bamboo_agents_docker_cli_binary
+
+- name: Check host Docker CLI plugins directory
+  ansible.builtin.stat:
+    path: "{{ bamboo_agents_docker_cli_plugins_path }}"
+  register: bamboo_agents_docker_cli_plugins
+
+- name: Require host Docker CLI and plugins
+  ansible.builtin.assert:
+    that:
+      - bamboo_agents_docker_cli_binary.stat.isreg | default(false)
+      - bamboo_agents_docker_cli_plugins.stat.isdir | default(false)
+    fail_msg: >-
+      Docker CLI or CLI plugins are missing. Run the docker_engine role first.
+
+- name: Read Docker socket ownership
+  ansible.builtin.stat:
+    path: /var/run/docker.sock
+  register: bamboo_agents_docker_socket
+
+- name: Require the Docker socket
+  ansible.builtin.assert:
+    that:
+      - bamboo_agents_docker_socket.stat.issock | default(false)
+    fail_msg: "Docker socket /var/run/docker.sock does not exist."
+
+- name: Create the Compose project directory
+  ansible.builtin.file:
+    path: "{{ bamboo_agents_compose_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Create persistent Bamboo Agent home directories
+  ansible.builtin.file:
+    path: "/home/bamboo-agent-{{ item }}"
+    state: directory
+    owner: "{{ bamboo_agents_uid }}"
+    group: "{{ bamboo_agents_gid }}"
+    mode: "0750"
+  loop: "{{ range(1, bamboo_agents_count + 1) | list }}"
+  loop_control:
+    label: "bamboo-agent-{{ item }}"
+
+- name: Render the Bamboo Agents Compose definition
+  ansible.builtin.template:
+    src: compose.yml.j2
+    dest: "{{ bamboo_agents_compose_dir }}/compose.yml"
+    owner: root
+    group: root
+    mode: "0644"
+  register: bamboo_agents_compose_definition
+
+- name: Deploy Bamboo Agent containers
+  community.docker.docker_compose_v2:
+    project_src: "{{ bamboo_agents_compose_dir }}"
+    project_name: "{{ bamboo_agents_compose_project_name }}"
+    state: present
+    pull: missing
+    remove_orphans: false

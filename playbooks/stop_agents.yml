@@ -1,0 +1,14 @@
+---
+- name: Stop Bamboo Agent containers without deleting their data
+  hosts: bamboo_build_hosts
+  remote_user: ansible
+  become: true
+  gather_facts: false
+  serial: "{{ deployment_serial | default(1) }}"
+
+  tasks:
+    - name: Stop the Bamboo Agents Compose project
+      community.docker.docker_compose_v2:
+        project_src: "{{ bamboo_agents_compose_dir }}"
+        project_name: "{{ bamboo_agents_compose_project_name }}"
+        state: stopped
